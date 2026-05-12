@@ -1,4 +1,4 @@
-This program has several flags. & carries out command concurrently. > imports output of command on the left to file on the right. < exports content of file of the right to command on the left. | takes output of left command to be input of right command. Command parameters and linux terminal command flags like -la are currently not supported for file IO commands or piped commands. 
+This program has several flags. & carries out command concurrently. > imports output of command on the left to file on the right. < exports content of file of the right to command on the left. | takes output of left command to be input of right command. Command parameters are currently not supported for file IO commands or piped commands. 
 
 Example inputs:
 - sleep 3
