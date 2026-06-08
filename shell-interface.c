@@ -123,7 +123,7 @@ int main(void) {
                 else if (input[x] == ' ' && x == (strcspn(input, "|") + 1))
                     continue;
                 else    
-                    right_command[command_increment++] = input[x];\
+                    right_command[command_increment++] = input[x];
             right_command[command_increment] = 0;
 
             char *left_args[10];
