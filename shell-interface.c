@@ -1,186 +1,109 @@
-#include <string.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <fcntl.h>
+#include <string.h>
 #include <sys/wait.h>
-#include <stdbool.h>
 
-int main(void) {
-    char past_command[50] = {false};
-    char* parameters[] = {NULL};
-
+int main() {
+    char previous[100];
     while (1) {
-        bool flags[5] = {false};
-        printf("osh> ");
-        char input[50];
-        fgets(input, sizeof(input), stdin);
-        input[strcspn(input, "\n")] = 0;
+        printf("Enter shell command :");
+        char input[100];
+        fgets(input, 100, stdin);
+        if (strstr(input, "exit") != NULL) break;
+        if (input[0] == '!') strcpy(input, previous);
+        else strcpy(previous, input);
+        int piped = 0;
+        int concurrent = 0;
 
-        if (strcspn(input, "!") != strlen(input)) {
-            flags[0] = true;
-            strcpy(input, past_command);
-        } else {
-            strcpy(past_command, input);
-        }
+        for (int i = 0; input[i] != '\0'; i++)
+            if (input[i] == '|')
+                piped = 1;
+            else if (input[i] == '&')
+                concurrent = 1;
 
-        if (strcspn(input, "&") != strlen(input))
-            flags[1] = true;
-        if (strcspn(input, ">") != strlen(input))
-            flags[2] = true;
-        if (strcspn(input, "<") != strlen(input))
-            flags[3] = true;
-        if (strcspn(input, "|") != strlen(input))
-            flags[4] = true;
+        char formatted_input[100];
+        int increment = 0;
+        int count = 1;
+        int firstcount = 1;
+        int secondcount = 0;
 
-        if (flags[2]) {
-            if (flags[1])
-                input[strcspn(input, "&") - 1] = 0;
+        for (int i = 0; input[i] != '\0'; i++)
+            if (input[i] == ' ') {
+                if (count == 1 && input[i+1] != '|')
+                    firstcount++;
+                else if (count == 2) secondcount++;
 
-            char file[15];
-            int file_increment = 0;
-            for (int x = (strcspn(input, ">") + 1); x < strlen(input); x++)
-                if (input[x] == ' ')
-                    continue;
-                else
-                    file[file_increment++] = input[x];
-            file[file_increment] = 0;
+                if (input[i-1] != '|')
+                    formatted_input[increment++] = '\0';
+            } else if (input[i] != '|' && input[i] != '&' && input[i] != '\n')
+                formatted_input[increment++] = input[i];
+            else if (input[i] == '|')
+                count = 2;
+        
+        formatted_input[increment] = '\0';
 
-            char command[15];
-            int command_increment = 0;
-            for (int x = 0; x < strcspn(input, ">"); x++)
-                if (input[x] == ' ')
-                    continue;
-                else
-                    command[command_increment++] = input[x];
+        if (piped == 0) {
+            char *arguments[firstcount];
+            int increment2 = 0;
+            for (int i = 0; i < increment; i++)
+                if (i == 0)
+                    arguments[increment2++] = &formatted_input[i];
+                else if (formatted_input[i-1] == '\0')
+                    arguments[increment2++] = &formatted_input[i];
+            arguments[increment2] = NULL;
 
-            command[command_increment] = 0;
-
-            pid_t process = fork();
-            if (process == 0) {
-                int fd = open(file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-                dup2(fd, STDOUT_FILENO);
-                close(fd);
-                execvp(command, parameters);
+            pid_t pid = fork();
+            if (pid == 0) {
+                execvp(arguments[0], arguments);
             }
-            if (!flags[1])
-                waitpid(process, NULL, 0);
-        } else if (flags[3]) {
-            if (flags[1])
-                input[strcspn(input, "&") - 1] = 0;
-
-            char command[15];
-            int command_increment = 0;
-            for (int x = 0; x < strcspn(input, "<"); x++)
-                if (input[x] == ' ')
-                    continue;
-                else
-                    command[command_increment++] = input[x];
-            command[command_increment] = 0;
-
-            char file[15];
-            int file_increment = 0;
-            for (int x = (strcspn(input, "<") + 1); x < strlen(input); x++)
-                if (input[x] == ' ')
-                    continue;
-                else
-                    file[file_increment++] = input[x];
-            file[file_increment] = 0;
-
-            pid_t process = fork();
-            if (process == 0) {
-                int fd = open(file, O_RDONLY);
-                dup2(fd, STDIN_FILENO);
-                close(fd);
-                execvp(command, parameters);
-            }
-
-            if (!flags[1])
-             waitpid(process, NULL, 0);
-        } else if (flags[4]) {
-            if (flags[1])
-                input[strcspn(input, "&") - 1] = 0;
-
-            int piped[2];
-            pipe(piped);
-
-            char left_command[10];
-            char right_command[10];
-            int command_increment = 0;
-
-            for (int x = 0; x < strcspn(input, "|"); x++)
-                if (input[x] == ' ')
-                    continue;
-                else
-                    left_command[command_increment++] = input[x];
-            left_command[command_increment] = 0;
-
-            command_increment = 0;
-
-            for (int x = (strcspn(input, "|") + 1); x < strlen(input); x++)
-                if (input[x] == ' ' && strlen(input) - x == 1)
-                    continue;
-                else if (input[x] == ' ' && x == (strcspn(input, "|") + 1))
-                    continue;
-                else    
-                    right_command[command_increment++] = input[x];
-            right_command[command_increment] = 0;
-
-            char *left_args[10];
-            int left_argc = 0;
-            left_args[left_argc++] = strtok(left_command, " ");
-            while ((left_args[left_argc] = strtok(NULL, " ")) != NULL)
-                left_argc++;
             
-            pid_t left = fork();
-            if (left == 0) {
-                dup2(piped[1], STDOUT_FILENO);
-                close(piped[0]);
-                close(piped[1]);
-                execvp(left_args[0], left_args);
-            } 
+            if (concurrent == 0)
+                waitpid(pid, NULL, 0);
+        } else {
+            char *arguments1[firstcount+1];
+            char *arguments2[secondcount+1];
+            int increment2 = 0;
+            for (int i = 0; i < increment; i++)
+                if (firstcount > 0) {
+                    if (i == 0 || formatted_input[i-1] == '\0') {
+                        arguments1[increment2++] = &formatted_input[i];
+                        firstcount--;
+                    }
+                    
+                    if (firstcount == 0) {
+                        arguments1[increment2] = NULL;
+                        increment2 = 0;
+                    }
+                } else if (formatted_input[i-1] == '\0') {
+                    arguments2[increment2++] = &formatted_input[i];
+                }
 
-            char *right_args[10];
-            int right_argc = 0;
-            right_args[right_argc++] = strtok(right_command, " ");
-            while ((right_args[right_argc] = strtok(NULL, " ")) != NULL)
-                right_argc++;
+            arguments2[increment2] = NULL;
 
-            pid_t right = fork();
-            if (right == 0) {
-                dup2(piped[0], STDIN_FILENO);
-                close(piped[0]);
-                close(piped[1]);
-                execvp(right_args[0], right_args);
+            int ends[2];
+            pipe(ends);
+
+            pid_t pid1 = fork();
+            if (pid1 == 0) {
+                dup2(ends[1], STDOUT_FILENO);
+                close(ends[0]);
+                execvp(arguments1[0], arguments1);
             }
 
-            close(piped[0]);
-            close(piped[1]);
+            pid_t pid2 = fork();
+            if (pid2 == 0) {
+                dup2(ends[0], STDIN_FILENO);
+                close(ends[1]);
+                execvp(arguments2[0], arguments2);
+            }
 
-            if (!flags[1])
-                waitpid(left, NULL, 0);
-            if (!flags[1])
-                waitpid(right, NULL, 0);
-        } else {
-            if (!strcmp(input, "exit"))
-                return 0;
+            close(ends[0]);
+            close(ends[1]);
 
-            if (flags[1])
-                input[strcspn(input, "&") - 1] = 0;
-
-            char *args[10];
-            int argc = 0;
-            args[argc++] = strtok(input, " ");
-            while ((args[argc] = strtok(NULL, " ")) != NULL)
-                argc++;
-
-            pid_t process = fork();
-
-            if (process == 0)
-                execvp(args[0], args);
-
-            if (!flags[1])
-                waitpid(process, NULL, 0);
+            if (concurrent == 0) {
+                waitpid(pid1, NULL, 0);
+                waitpid(pid2, NULL, 0);
+            }
         }
     }
 }
