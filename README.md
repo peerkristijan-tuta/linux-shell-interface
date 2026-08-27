@@ -3,8 +3,13 @@ Example inputs to command prompt from program:
 - ls -l
 - ls -l -a
 - ls | grep shell
-| allows piping
+
+the command '|' allows piping
+
 - !
-! causes the previous entered command to be re-execute
+
+the command '!' causes the previous entered command to be re-execute
+
 - sleep 3 &
-& causes the command to run concurrently 
+  
+the command '&' causes the command to run concurrently 
