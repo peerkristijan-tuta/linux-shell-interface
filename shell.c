@@ -86,19 +86,16 @@ int main() {
             pid_t pid1 = fork();
             if (pid1 == 0) {
                 dup2(ends[1], STDOUT_FILENO);
-                close(ends[0]);
                 execvp(arguments1[0], arguments1);
             }
+
+            close(ends[1]);
 
             pid_t pid2 = fork();
             if (pid2 == 0) {
                 dup2(ends[0], STDIN_FILENO);
-                close(ends[1]);
                 execvp(arguments2[0], arguments2);
             }
-
-            close(ends[0]);
-            close(ends[1]);
 
             if (concurrent == 0) {
                 waitpid(pid1, NULL, 0);
